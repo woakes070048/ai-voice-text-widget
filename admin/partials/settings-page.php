@@ -18,7 +18,8 @@ if ( isset( $_POST['ai_widget_settings_submit'] ) && check_admin_referer( 'ai_wi
         'ai_widget_elevenlabs_api_key', 'ai_widget_elevenlabs_voice_id',
         'ai_widget_openai_api_key', 'ai_widget_personality', 'ai_widget_custom_prompt',
         'ai_widget_use_openai_assistant', 'ai_widget_openai_assistant_id', 'ai_widget_system_prompt',
-        'ai_widget_voice_enabled', 'ai_widget_text_enabled', 'ai_widget_free_limit'
+        'ai_widget_voice_enabled', 'ai_widget_text_enabled', 'ai_widget_free_limit',
+        'ai_widget_chat_provider', 'ai_widget_n8n_webhook_url'
     );
 
     foreach ( $options as $option ) {
@@ -59,11 +60,105 @@ $system_prompt = get_option( 'ai_widget_system_prompt', '' );
 $voice_enabled = get_option( 'ai_widget_voice_enabled', true );
 $text_enabled = get_option( 'ai_widget_text_enabled', true );
 $free_limit = get_option( 'ai_widget_free_limit', 100 );
+
+$chat_provider = get_option( 'ai_widget_chat_provider', 'openai' );
+$n8n_webhook_url = get_option( 'ai_widget_n8n_webhook_url', '' );
 ?>
 
-<div class="wrap">
+<div class="wrap ai-widget-admin-wrap">
     <h1>⚙️ <?php echo esc_html( get_admin_page_title() ); ?></h1>
     
+    <div class="ai-widget-admin-container">
+        <!-- Panel Lateral -->
+        <div class="ai-widget-sidebar">
+            <div class="ai-widget-card">
+                <h3>🎯 Configuración Rápida</h3>
+                <div class="ai-widget-quick-links">
+                    <a href="#tab-general" class="quick-link">
+                        <span class="dashicons dashicons-admin-generic"></span>
+                        <div>
+                            <strong>General</strong>
+                            <small>Configuración básica</small>
+                        </div>
+                    </a>
+                    <a href="#tab-provider" class="quick-link">
+                        <span class="dashicons dashicons-admin-plugins"></span>
+                        <div>
+                            <strong>Proveedores IA</strong>
+                            <small>VAPI, OpenAI, n8n</small>
+                        </div>
+                    </a>
+                    <a href="#tab-system-prompt" class="quick-link">
+                        <span class="dashicons dashicons-admin-customizer"></span>
+                        <div>
+                            <strong>System Prompt</strong>
+                            <small>Personalidad del bot</small>
+                        </div>
+                    </a>
+                    <a href="#tab-appearance" class="quick-link">
+                        <span class="dashicons dashicons-admin-appearance"></span>
+                        <div>
+                            <strong>Apariencia</strong>
+                            <small>Colores y estilos</small>
+                        </div>
+                    </a>
+                    <a href="#tab-freemium" class="quick-link">
+                        <span class="dashicons dashicons-chart-line"></span>
+                        <div>
+                            <strong>Freemium</strong>
+                            <small>Límites y planes</small>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="ai-widget-card">
+                <h3>📊 Estado del Sistema</h3>
+                <div class="ai-widget-status">
+                    <div class="status-item">
+                        <span class="status-dot <?php echo $enabled ? 'active' : 'inactive'; ?>"></span>
+                        <span>Widget: <?php echo $enabled ? 'Activo' : 'Inactivo'; ?></span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-dot <?php echo !empty($vapi_public_key) ? 'active' : 'inactive'; ?>"></span>
+                        <span>VAPI: <?php echo !empty($vapi_public_key) ? 'Configurado' : 'Pendiente'; ?></span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-dot <?php echo !empty($openai_api_key) ? 'active' : 'inactive'; ?>"></span>
+                        <span>OpenAI: <?php echo !empty($openai_api_key) ? 'Configurado' : 'Pendiente'; ?></span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-dot <?php echo !empty($n8n_webhook_url) ? 'active' : 'inactive'; ?>"></span>
+                        <span>n8n: <?php echo !empty($n8n_webhook_url) ? 'Configurado' : 'Pendiente'; ?></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ai-widget-card">
+                <h3>💡 Recursos</h3>
+                <div class="ai-widget-resources">
+                    <a href="https://vapi.ai/dashboard" target="_blank" class="resource-link">
+                        <span class="dashicons dashicons-external"></span>
+                        VAPI Dashboard
+                    </a>
+                    <a href="https://platform.openai.com/" target="_blank" class="resource-link">
+                        <span class="dashicons dashicons-external"></span>
+                        OpenAI Platform
+                    </a>
+                    <a href="https://elevenlabs.io/" target="_blank" class="resource-link">
+                        <span class="dashicons dashicons-external"></span>
+                        ElevenLabs
+                    </a>
+                    <a href="https://n8n.io/" target="_blank" class="resource-link">
+                        <span class="dashicons dashicons-external"></span>
+                        n8n Documentation
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido Principal -->
+        <div class="ai-widget-main-content">
     <form method="post" action="">
         <?php wp_nonce_field( 'ai_widget_settings' ); ?>
         
@@ -166,38 +261,102 @@ $free_limit = get_option( 'ai_widget_free_limit', 100 );
 
             <hr style="margin: 30px 0;">
 
-            <h3>💬 OpenAI (Chat de Texto)</h3>
+            <h3>💬 Proveedor de Chat de Texto</h3>
             <table class="form-table">
                 <tr>
-                    <th>API Key</th>
+                    <th>Seleccionar Proveedor</th>
                     <td>
-                        <input type="text" name="ai_widget_openai_api_key" id="ai_widget_openai_api_key" value="<?php echo esc_attr( $openai_api_key ); ?>" class="large-text">
-                        <p class="description">Necesario para el modo de chat de texto</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Personalidad (Legacy)</th>
-                    <td>
-                        <select name="ai_widget_personality" id="ai_widget_personality">
-                            <option value="friendly" <?php selected( $personality, 'friendly' ); ?>>Amigable</option>
-                            <option value="professional" <?php selected( $personality, 'professional' ); ?>>Profesional</option>
-                            <option value="casual" <?php selected( $personality, 'casual' ); ?>>Casual</option>
-                            <option value="technical" <?php selected( $personality, 'technical' ); ?>>Técnico</option>
-                            <option value="sales" <?php selected( $personality, 'sales' ); ?>>Ventas</option>
-                            <option value="support" <?php selected( $personality, 'support' ); ?>>Soporte</option>
-                            <option value="custom" <?php selected( $personality, 'custom' ); ?>>Personalizado</option>
+                        <select name="ai_widget_chat_provider" id="ai_widget_chat_provider">
+                            <option value="openai" <?php selected( $chat_provider, 'openai' ); ?>>OpenAI (ChatGPT)</option>
+                            <option value="n8n" <?php selected( $chat_provider, 'n8n' ); ?>>n8n Webhook</option>
                         </select>
-                        <p class="description">⚠️ Legacy: Usa la pestaña "System Prompt" para configuración avanzada</p>
-                    </td>
-                </tr>
-                <tr id="custom-prompt-row" style="<?php echo $personality === 'custom' ? '' : 'display:none;'; ?>">
-                    <th>Prompt Personalizado (Legacy)</th>
-                    <td>
-                        <textarea name="ai_widget_custom_prompt" rows="4" class="large-text"><?php echo esc_textarea( $custom_prompt ); ?></textarea>
-                        <p class="description">⚠️ Legacy: Usa la pestaña "System Prompt" para la nueva funcionalidad</p>
+                        <p class="description">Elige el proveedor que procesará las conversaciones de texto</p>
                     </td>
                 </tr>
             </table>
+
+            <!-- OpenAI Chat Section -->
+            <div id="openai-chat-section" style="<?php echo $chat_provider === 'openai' ? '' : 'display:none;'; ?>">
+                <h3>🤖 OpenAI (Chat de Texto)</h3>
+                <table class="form-table">
+                    <tr>
+                        <th>API Key</th>
+                        <td>
+                            <input type="text" name="ai_widget_openai_api_key" id="ai_widget_openai_api_key" value="<?php echo esc_attr( $openai_api_key ); ?>" class="large-text">
+                            <p class="description">Necesario para el modo de chat de texto con OpenAI</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Personalidad (Legacy)</th>
+                        <td>
+                            <select name="ai_widget_personality" id="ai_widget_personality">
+                                <option value="friendly" <?php selected( $personality, 'friendly' ); ?>>Amigable</option>
+                                <option value="professional" <?php selected( $personality, 'professional' ); ?>>Profesional</option>
+                                <option value="casual" <?php selected( $personality, 'casual' ); ?>>Casual</option>
+                                <option value="technical" <?php selected( $personality, 'technical' ); ?>>Técnico</option>
+                                <option value="sales" <?php selected( $personality, 'sales' ); ?>>Ventas</option>
+                                <option value="support" <?php selected( $personality, 'support' ); ?>>Soporte</option>
+                                <option value="custom" <?php selected( $personality, 'custom' ); ?>>Personalizado</option>
+                            </select>
+                            <p class="description">⚠️ Legacy: Usa la pestaña "System Prompt" para configuración avanzada</p>
+                        </td>
+                    </tr>
+                    <tr id="custom-prompt-row" style="<?php echo $personality === 'custom' ? '' : 'display:none;'; ?>">
+                        <th>Prompt Personalizado (Legacy)</th>
+                        <td>
+                            <textarea name="ai_widget_custom_prompt" rows="4" class="large-text"><?php echo esc_textarea( $custom_prompt ); ?></textarea>
+                            <p class="description">⚠️ Legacy: Usa la pestaña "System Prompt" para la nueva funcionalidad</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- n8n Webhook Section -->
+            <div id="n8n-chat-section" style="<?php echo $chat_provider === 'n8n' ? '' : 'display:none;'; ?>">
+                <h3>🔗 n8n Webhook</h3>
+                <table class="form-table">
+                    <tr>
+                        <th>Webhook URL</th>
+                        <td>
+                            <input type="url" name="ai_widget_n8n_webhook_url" id="ai_widget_n8n_webhook_url" value="<?php echo esc_attr( $n8n_webhook_url ); ?>" class="large-text" placeholder="https://tu-instancia.n8n.cloud/webhook/tu-webhook-id">
+                            <p class="description">
+                                URL completa del webhook de n8n que procesará los mensajes<br>
+                                <strong>Ejemplo:</strong> https://your-instance.app.n8n.cloud/webhook/ai-chat
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Formato de Request</th>
+                        <td>
+                            <p class="description" style="background:#f0f6fc; padding:12px; border-left:3px solid #2196F3; border-radius:4px; font-family:monospace; font-size:13px;">
+                                <strong>POST Request a tu webhook:</strong><br>
+                                {<br>
+                                &nbsp;&nbsp;"message": "mensaje del usuario",<br>
+                                &nbsp;&nbsp;"session_id": "id-de-sesión",<br>
+                                &nbsp;&nbsp;"conversation_history": [...]<br>
+                                }<br><br>
+                                <strong>Respuesta esperada:</strong><br>
+                                {<br>
+                                &nbsp;&nbsp;"response": "respuesta del asistente"<br>
+                                }
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Ejemplo de Workflow</th>
+                        <td>
+                            <p class="description">
+                                <strong>Nodos recomendados:</strong><br>
+                                1. <strong>Webhook</strong> (trigger) - Recibe el mensaje<br>
+                                2. <strong>OpenAI Chat Model</strong> (o cualquier LLM) - Procesa el mensaje<br>
+                                3. <strong>Respond to Webhook</strong> - Devuelve la respuesta<br>
+                                <br>
+                                💡 <strong>Tip:</strong> Puedes usar cualquier lógica en n8n (bases de datos, APIs externas, RAG, etc.)
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
         </div>
 
         <!-- TAB: SYSTEM PROMPT -->
@@ -357,22 +516,249 @@ $free_limit = get_option( 'ai_widget_free_limit', 100 );
             <input type="submit" name="ai_widget_settings_submit" class="button button-primary" value="Guardar Cambios">
         </p>
     </form>
-</div>
+        </div><!-- .ai-widget-main-content -->
+    </div><!-- .ai-widget-admin-container -->
+</div><!-- .wrap -->
 
 <style>
-.tab-content { display: none; padding: 20px 0; }
-.nav-tab-wrapper { margin-bottom: 0; }
+.ai-widget-admin-wrap {
+    margin-right: 20px;
+}
+
+.ai-widget-admin-container {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.ai-widget-sidebar {
+    flex: 0 0 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.ai-widget-main-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-widget-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.ai-widget-card h3 {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ai-widget-quick-links {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.quick-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    text-decoration: none;
+    color: #374151;
+    transition: all 0.2s ease;
+}
+
+.quick-link:hover {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+    transform: translateX(4px);
+}
+
+.quick-link.active {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+}
+
+.quick-link.active small {
+    opacity: 0.9;
+}
+
+.quick-link .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+}
+
+.quick-link div {
+    flex: 1;
+}
+
+.quick-link strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.quick-link small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+.ai-widget-status {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #555;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-dot.active {
+    background: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.status-dot.inactive {
+    background: #94a3b8;
+}
+
+.ai-widget-resources {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.resource-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    text-decoration: none;
+    color: #2271b1;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.resource-link:hover {
+    background: #e5e7eb;
+    border-color: #cbd5e1;
+    color: #135e96;
+}
+
+.resource-link .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Tabs en el contenido principal */
+.tab-content { 
+    display: none; 
+    padding: 20px 0; 
+}
+
+.nav-tab-wrapper { 
+    margin-bottom: 0; 
+    background: #fff;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 10px 20px 0;
+}
+
+.tab-content {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 30px;
+}
+
+/* Responsive */
+@media (max-width: 1280px) {
+    .ai-widget-admin-container {
+        flex-direction: column;
+    }
+    
+    .ai-widget-sidebar {
+        flex: 1;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .ai-widget-card {
+        flex: 1;
+        min-width: 250px;
+    }
+}
+
+@media (max-width: 768px) {
+    .ai-widget-sidebar {
+        flex-direction: column;
+    }
+}
 </style>
 
 <script>
 jQuery(document).ready(function($) {
-    // Tabs
+    // Función para cambiar de tab
+    function switchTab(tabId) {
+        $('.nav-tab').removeClass('nav-tab-active');
+        $('.tab-content').hide();
+        $('.quick-link').removeClass('active');
+        
+        // Activar tab y contenido
+        $('.nav-tab[href="' + tabId + '"]').addClass('nav-tab-active');
+        $(tabId).show();
+        $('.quick-link[href="' + tabId + '"]').addClass('active');
+    }
+    
+    // Tabs del header
     $('.nav-tab').on('click', function(e) {
         e.preventDefault();
-        $('.nav-tab').removeClass('nav-tab-active');
-        $(this).addClass('nav-tab-active');
-        $('.tab-content').hide();
-        $($(this).attr('href')).show();
+        switchTab($(this).attr('href'));
+    });
+    
+    // Enlaces del sidebar
+    $('.quick-link').on('click', function(e) {
+        e.preventDefault();
+        switchTab($(this).attr('href'));
+        
+        // Scroll suave al contenido
+        $('html, body').animate({
+            scrollTop: $('.ai-widget-main-content').offset().top - 32
+        }, 300);
     });
 
     // Color Pickers
@@ -383,6 +769,17 @@ jQuery(document).ready(function($) {
         $('.provider-config').hide();
         $('#provider-' + $(this).val()).show();
     }).trigger('change');
+
+    // Cambio de proveedor de chat
+    $('#ai_widget_chat_provider').on('change', function() {
+        if ($(this).val() === 'openai') {
+            $('#openai-chat-section').show();
+            $('#n8n-chat-section').hide();
+        } else if ($(this).val() === 'n8n') {
+            $('#openai-chat-section').hide();
+            $('#n8n-chat-section').show();
+        }
+    });
 
     // Mostrar/ocultar prompt personalizado
     $('#ai_widget_personality').on('change', function() {

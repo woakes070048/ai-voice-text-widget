@@ -1,7 +1,29 @@
 /**
- * Widget App VAPI - JavaScript principal del widget con VAPI y ElevenLabs
+ * AI Widget by Workfluz - Widget App VAPI
  * 
  * @package AI_Voice_Text_Widget
+ * @version 1.0.0
+ * @copyright Copyright (c) 2024-2025 Workfluz. All rights reserved.
+ * @license Proprietary - See LICENSE.txt
+ * 
+ * ============================================================================
+ * AVISO LEGAL - CÓDIGO PROPIETARIO Y CONFIDENCIAL
+ * ============================================================================
+ * 
+ * Este código es propiedad exclusiva de Workfluz y está protegido por las
+ * leyes de derechos de autor y tratados internacionales de propiedad intelectual.
+ * 
+ * QUEDA PROHIBIDO:
+ * - Copiar, modificar o redistribuir este código
+ * - Realizar ingeniería inversa o descompilación
+ * - Usar este código en proyectos no autorizados
+ * - Eliminar estos avisos de copyright
+ * 
+ * El uso no autorizado puede resultar en acciones legales.
+ * Para licencias: legal@workfluz.com | https://workfluz.com
+ * 
+ * © 2024-2025 Workfluz. Todos los derechos reservados.
+ * ============================================================================
  */
 
 (function() {
@@ -24,6 +46,15 @@
             this.remaining = 100;
             
             this.vapiInstance = null;
+            
+            // Voice tracking
+            this.callStartTime = null;
+            this.callDuration = 0;
+            
+            // Voice recording
+            this.mediaRecorder = null;
+            this.audioChunks = [];
+            this.isRecording = false;
 
             this.init();
         }
@@ -104,149 +135,107 @@
             .ai-tooltip { position: absolute; bottom: calc(100% + 12px); right: 0; background: rgba(0, 0, 0, 0.9); color: white; padding: 8px 14px; border-radius: 8px; font-size: 13px; white-space: nowrap; opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
             .ai-logo-container:not(.session-active) .ai-logo-button:hover .ai-tooltip { opacity: 1; transform: translateY(-4px); }
             
-            @keyframes fade-in{from{opacity:0; transform:scale(.97)} to{opacity:1; transform:scale(1)}}
-            @keyframes pop-in {
-                0% { transform: scale(0) translateY(20px); opacity: 0; }
-                50% { transform: scale(1.1) translateY(-5px); }
-                100% { transform: scale(1) translateY(0); opacity: 1; }
-            }
-            
-            .ai-floating-buttons {
+            /* Botones de acción pequeños (voz y chat) */
+            .ai-action-button {
                 position: absolute;
-                bottom: calc(100% + 16px);
-                right: 50%;
-                transform: translateX(50%);
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(10px);
+                border: 2px solid rgba(255, 255, 255, 0.4);
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+                cursor: pointer;
                 display: flex;
-                flex-direction: column;
-                gap: 12px;
-                opacity: 0;
-                pointer-events: none;
-                transition: opacity 0.3s ease;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
                 z-index: 10003;
+                opacity: 0;
+                transform: translateY(0) scale(0.5);
+                pointer-events: none;
             }
             
-            .ai-floating-buttons.visible {
+            /* Mostrar botones cuando el logo tiene clase 'menu-open' */
+            .ai-logo-container.menu-open .ai-action-button {
                 opacity: 1;
                 pointer-events: auto;
             }
             
-            .ai-floating-btn {
-                width: 56px;
-                height: 56px;
-                border-radius: 50%;
-                border: none;
-                cursor: pointer;
-                position: relative;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: transparent;
-                overflow: visible;
-                animation: pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            .ai-action-button svg {
+                width: 18px;
+                height: 18px;
             }
             
-            .ai-floating-btn:nth-child(1) {
-                animation-delay: 0.05s;
+            .ai-action-button:hover {
+                transform: translateY(0) scale(1.15);
+                box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18), inset 0 1px 3px rgba(255, 255, 255, 0.9);
             }
             
-            .ai-floating-btn:nth-child(2) {
-                animation-delay: 0.1s;
+            .ai-action-button:active {
+                transform: translateY(0) scale(1.05);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.7);
             }
             
-            .ai-floating-btn::before {
-                content: '';
-                position: absolute;
-                inset: -2px;
-                border-radius: 50%;
-                background: transparent;
-                z-index: -2;
-                filter: blur(8px);
-                opacity: 0;
-                transition: opacity 0.3s ease;
+            /* Botón de VOZ - se despliega hacia arriba */
+            .ai-voice-button {
+                bottom: 80px;
+                right: 17px;
             }
             
-            .ai-floating-btn::after {
-                content: '';
-                position: absolute;
-                inset: 0;
-                border-radius: 50%;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(12px) saturate(180%);
-                -webkit-backdrop-filter: blur(12px) saturate(180%);
-                border: 1px solid rgba(255, 255, 255, 0.8);
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
-                z-index: -1;
-                transition: all 0.3s ease;
+            .ai-logo-container.menu-open .ai-voice-button {
+                transform: translateY(0) scale(1);
             }
             
-            .ai-floating-btn:hover {
-                transform: scale(1.12) translateY(-2px);
-            }
-            
-            .ai-floating-btn:active {
-                transform: scale(0.95);
-            }
-            
-            .ai-floating-btn.voice::before {
-                background: linear-gradient(135deg, #3b82f6, #2563eb);
-                opacity: 0.6;
-            }
-            
-            .ai-floating-btn.text::before {
-                background: linear-gradient(135deg, #10b981, #059669);
-                opacity: 0.6;
-            }
-            
-            .ai-floating-btn:hover::before {
-                opacity: 0.8;
-                filter: blur(12px);
-            }
-            
-            .ai-floating-btn.voice:hover::after {
-                border-color: rgba(59, 130, 246, 0.5);
-                box-shadow: 0 12px 32px rgba(59, 130, 246, 0.25), 0 4px 12px rgba(59, 130, 246, 0.15);
-            }
-            
-            .ai-floating-btn.text:hover::after {
-                border-color: rgba(16, 185, 129, 0.5);
-                box-shadow: 0 12px 32px rgba(16, 185, 129, 0.25), 0 4px 12px rgba(16, 185, 129, 0.15);
-            }
-            
-            .ai-floating-btn svg {
-                width: 24px;
-                height: 24px;
-                position: relative;
-                z-index: 1;
-                transition: all 0.3s ease;
-                stroke-width: 2.5;
-            }
-            
-            .ai-floating-btn.voice svg {
+            .ai-voice-button svg {
                 stroke: #3b82f6;
+                transition: all 0.2s ease;
             }
             
-            .ai-floating-btn.text svg {
+            .ai-voice-button:hover {
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                border-color: rgba(59, 130, 246, 0.6);
+            }
+            
+            .ai-voice-button:hover svg {
+                stroke: #ffffff;
+                transform: scale(1.1);
+            }
+            
+            /* Botón de CHAT - se despliega hacia arriba (más arriba que VOZ) */
+            .ai-chat-button {
+                bottom: 125px;
+                right: 17px;
+            }
+            
+            .ai-logo-container.menu-open .ai-chat-button {
+                transform: translateY(0) scale(1);
+            }
+            
+            .ai-chat-button svg {
                 stroke: #10b981;
+                transition: all 0.2s ease;
             }
             
-            .ai-floating-btn:hover svg {
-                transform: scale(1.15);
+            .ai-chat-button:hover {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                border-color: rgba(16, 185, 129, 0.6);
             }
             
-            .ai-floating-btn.voice:hover svg {
-                stroke: #2563eb;
-                filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.4));
+            .ai-chat-button:hover svg {
+                stroke: #ffffff;
+                transform: scale(1.1);
             }
             
-            .ai-floating-btn.text:hover svg {
-                stroke: #059669;
-                filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.4));
+            /* Ocultar botones cuando hay sesión activa o cargando */
+            .ai-logo-container.session-active .ai-action-button,
+            .ai-logo-container.loading .ai-action-button {
+                opacity: 0;
+                pointer-events: none;
+                transform: translateY(0) scale(0.3);
             }
             
-            .ai-mode-prompt {
-                display: none !important;
-            }
+            @keyframes fade-in{from{opacity:0; transform:scale(.97)} to{opacity:1; transform:scale(1)}}
             
             .ai-mode-card, .ai-chat-container {
                 border: 0;
@@ -536,7 +525,7 @@
             .ai-chat-bubble.user{ background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3); }
             .ai-chat-bubble.ai{ background:rgba(255, 255, 255, 0.95); color:#1e293b; align-self:flex-start; border-bottom-left-radius:4px; border: 1px solid rgba(0, 0, 0, 0.06); }
             
-            #ai-chat-form{ z-index: 2; position: relative; display:flex; gap:10px; padding:12px; border-top:1px solid rgba(0, 0, 0, 0.08); background: rgba(255, 255, 255, 0.6); border-radius: 0 0 16px 16px; }
+            #ai-chat-form{ z-index: 2; position: relative; display:flex; gap:10px; padding:12px; border-top:1px solid rgba(0, 0, 0, 0.08); background: rgba(255, 255, 255, 0.6); }
             #ai-chat-input{ flex:1; background:rgba(255, 255, 255, 0.95); border:1px solid rgba(0, 0, 0, 0.12); border-radius:10px; padding:12px 14px; color:#0f172a; font-size:16px; outline:none; transition: border-color .2s, box-shadow .2s; }
             #ai-chat-input:focus{ border-color: #2196F3; box-shadow:0 0 0 3px rgba(33,150,243,.15); background: #ffffff; }
             #ai-chat-input:disabled { background: rgba(241, 245, 249, 0.8); color: #94a3b8; }
@@ -545,6 +534,42 @@
             #ai-chat-form button{ background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color:#fff; border:none; border-radius:10px; padding:0 14px; font-size:16px; cursor:pointer; transition: transform .2s, box-shadow .2s; }
             #ai-chat-form button:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4); }
             #ai-chat-form button:disabled { background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%); cursor: not-allowed; transform: scale(1); }
+            
+            /* Botón de grabación de voz en el chat */
+            .ai-voice-record-btn {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+                width: 42px !important;
+                height: 42px !important;
+                padding: 0 !important;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 10px;
+                transition: all 0.2s ease;
+            }
+            
+            .ai-voice-record-btn:hover {
+                transform: scale(1.05) !important;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4) !important;
+            }
+            
+            .ai-voice-record-btn.recording {
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+                animation: pulse-recording 1.5s ease-in-out infinite;
+            }
+            
+            .ai-voice-record-btn.recording:hover {
+                box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
+            }
+            
+            @keyframes pulse-recording {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.8; transform: scale(1.05); }
+            }
+            
+            .ai-voice-record-btn svg {
+                stroke: currentColor;
+            }
             
             @keyframes bounce-dot { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
             .ai-typing-indicator .dot { display: inline-block; width: 8px; height: 8px; background-color: #64748b; border-radius: 50%; animation: bounce-dot 1.4s infinite ease-in-out both; margin: 0 2px; }
@@ -555,6 +580,83 @@
             .ai-chat-messages::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.04); border-radius: 10px; }
             .ai-chat-messages::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 10px; }
             .ai-chat-messages::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.3); }
+            
+            /* Branding Workfluz */
+            .ai-widget-branding {
+                z-index: 2;
+                position: relative;
+                padding: 8px 12px;
+                text-align: center;
+                font-size: 11px;
+                color: #94a3b8;
+                background: rgba(248, 250, 252, 0.6);
+                border-top: 1px solid rgba(0, 0, 0, 0.06);
+                border-radius: 0 0 16px 16px;
+            }
+            
+            .ai-widget-branding a {
+                color: #64748b;
+                text-decoration: none;
+                font-weight: 500;
+                transition: color 0.2s ease;
+            }
+            
+            .ai-widget-branding a:hover {
+                color: #2196F3;
+            }
+            
+            /* Branding de Workfluz.com debajo del formulario */
+            .ai-chat-branding {
+                padding: 8px 12px;
+                text-align: center;
+                font-size: 10px;
+                color: #94a3b8;
+                background: rgba(248, 250, 252, 0.6);
+                border-top: 1px solid rgba(0, 0, 0, 0.05);
+                border-radius: 0 0 16px 16px;
+            }
+            
+            .ai-chat-branding a {
+                color: #64748b;
+                text-decoration: none;
+                font-weight: 500;
+                transition: color 0.2s ease;
+            }
+            
+            .ai-chat-branding a:hover {
+                color: #2196F3;
+            }
+            
+            /* Mensaje temporal de branding para voz */
+            .ai-voice-branding {
+                position: fixed;
+                bottom: 110px;
+                right: 24px;
+                background: rgba(255, 255, 255, 0.98);
+                color: #64748b;
+                font-size: 11px;
+                padding: 8px 14px;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                opacity: 0;
+                transform: translateY(10px) scale(0.9);
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                pointer-events: none;
+                z-index: 10000;
+                white-space: nowrap;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+            }
+            
+            .ai-voice-branding.visible {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            
+            .ai-voice-branding a {
+                color: #2196F3;
+                text-decoration: none;
+                font-weight: 500;
+            }
             
             @media (max-width: 768px) {
                 .ai-logo-container { --glow-intensity: 15px; }
@@ -568,16 +670,9 @@
                 }
                 .ai-mode-header h4 { font-size: 16px; }
                 .ai-segmented { padding: 12px 16px; font-size: 14px; }
-                .ai-floating-btn {
-                    width: 52px;
-                    height: 52px;
-                }
-                .ai-floating-btn svg {
-                    width: 22px;
-                    height: 22px;
-                }
-                .ai-floating-buttons {
-                    gap: 10px;
+                .ai-voice-branding {
+                    bottom: 90px;
+                    right: 16px;
                 }
             }
             `;
@@ -590,50 +685,15 @@
          * Crea la estructura HTML del widget
          */
         createWidgetHTML() {
-            const logoSVG = aiWidgetData.logoSVG || `<svg class="ai-logo-svg" viewBox="0 0 1972.8 1870.45" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            const logoSVG = aiWidgetData.logoSVG || `<svg class="ai-logo-svg" viewBox="0 0 1972.8 1870.45" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true">
                 <defs>
-                    <linearGradient id="ai-gradient" x1="0" y1="935.23" x2="1972.8" y2="935.23" gradientUnits="userSpaceOnUse">
-                        <stop offset="0" stop-color="${aiWidgetData.primaryColor || '#76b4e3'}"/>
-                        <stop offset="1" stop-color="${aiWidgetData.secondaryColor || '#009bf0'}"/>
+                    <linearGradient id="workfluz-gradient" x1="0" y1="935.23" x2="1972.8" y2="935.23" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#76b4e3"/>
+                        <stop offset="1" stop-color="#009bf0"/>
                     </linearGradient>
                 </defs>
-                <path fill="url(#ai-gradient)" d="M1852.35,0c-53.22,0-100.11,34.94-115.34,85.94l-457.68,1533.26-232.79-916.61c-13.55-53.37-61.6-90.73-116.65-90.73h-85.51c-54.63,0-102.42,36.8-116.37,89.63l-243.58,922.28-239.29-921.78c-13.78-53.07-61.67-90.12-116.5-90.12h-8.2c-81.18,0-139.09,78.72-114.89,156.23l317.74,1017.87c15.7,50.27,62.23,84.5,114.89,84.5h93.66c54.27,0,101.84-36.33,116.12-88.69l229.35-840.98,229.36,840.98c14.28,52.36,61.84,88.69,116.13,88.69h94.97c52.02,0,98.16-33.42,114.37-82.84L1966.71,157.88C1992.24,80.04,1934.26,0,1852.35,0Z"/>
+                <path fill="url(#workfluz-gradient)" d="M1852.35,0c-53.22,0-100.11,34.94-115.34,85.94l-457.68,1533.26-232.79-916.61c-13.55-53.37-61.6-90.73-116.65-90.73h-85.51c-54.63,0-102.42,36.8-116.37,89.63l-243.58,922.28-239.29-921.78c-13.78-53.07-61.67-90.12-116.5-90.12h-8.2c-81.18,0-139.09,78.72-114.89,156.23l317.74,1017.87c15.7,50.27,62.23,84.5,114.89,84.5h93.66c54.27,0,101.84-36.33,116.12-88.69l229.35-840.98,229.36,840.98c14.28,52.36,61.84,88.69,116.13,88.69h94.97c52.02,0,98.16-33.42,114.37-82.84L1966.71,157.88C1992.24,80.04,1934.26,0,1852.35,0Z"/>
             </svg>`;
-
-            // Crear modal independiente
-            const modal = document.createElement('div');
-            modal.className = 'ai-mode-prompt';
-            modal.id = 'ai-mode-prompt';
-            modal.setAttribute('role', 'dialog');
-            modal.setAttribute('aria-modal', 'true');
-            modal.setAttribute('aria-labelledby', 'ai-mode-title');
-            modal.innerHTML = `
-                <div class="ai-mode-card">
-                    <div class="ai-mode-header">
-                        <h4 id="ai-mode-title">${aiWidgetData.welcomeMessage || '¿Cómo le gustaría interactuar?'}</h4>
-                        <button class="ai-mode-close" id="ai-mode-close" aria-label="Cerrar">&times;</button>
-                    </div>
-                    <div class="ai-mode-buttons">
-                        ${aiWidgetData.voiceEnabled ? `
-                        <button id="ai-voice-mode-btn" class="ai-mode-button voice" aria-label="Iniciar modo de voz">
-                            <svg class="ai-mode-icon" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                            </svg>
-                            <span class="ai-mode-label">Hablar</span>
-                        </button>
-                        ` : ''}
-                        ${aiWidgetData.textEnabled ? `
-                        <button id="ai-text-mode-btn" class="ai-mode-button text" aria-label="Iniciar modo de chat">
-                            <svg class="ai-mode-icon" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            </svg>
-                            <span class="ai-mode-label">Escribir</span>
-                        </button>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
 
             // Determinar texto del tooltip según modos habilitados
             let tooltipText = '';
@@ -650,29 +710,27 @@
             widget.id = 'ai-vapi-widget-container';
             widget.innerHTML = `
                 <div class="ai-logo-container" id="ai-logo-container" role="application" aria-label="Asistente de IA">
-                    <div class="ai-floating-buttons" id="ai-floating-buttons">
-                        ${aiWidgetData.voiceEnabled ? `
-                        <button class="ai-floating-btn voice" id="ai-voice-mode-btn" aria-label="Hablar">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                            </svg>
-                        </button>
-                        ` : ''}
-                        ${aiWidgetData.textEnabled ? `
-                        <button class="ai-floating-btn text" id="ai-text-mode-btn" aria-label="Escribir">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                            </svg>
-                        </button>
-                        ` : ''}
-                    </div>
-                    <button class="ai-logo-button" id="ai-logo-button" role="button" tabindex="0" aria-label="Iniciar interacción IA" aria-pressed="false">
+                    <button class="ai-logo-button" id="ai-logo-button" role="button" tabindex="0" aria-label="Logotipo del asistente" aria-pressed="false">
                         <div class="ai-logo-background">
                             ${logoSVG}
                             <canvas id="ai-sound-wave-canvas" aria-hidden="true"></canvas>
                         </div>
                         <span class="ai-tooltip" role="tooltip">${tooltipText}</span>
                     </button>
+                    ${aiWidgetData.voiceEnabled ? `
+                    <button class="ai-action-button ai-voice-button" id="ai-voice-btn" aria-label="Llamar por voz">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                    </button>
+                    ` : ''}
+                    ${aiWidgetData.textEnabled ? `
+                    <button class="ai-action-button ai-chat-button" id="ai-chat-btn" aria-label="Abrir chat">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </button>
+                    ` : ''}
                 </div>
                 <div id="ai-status-text" role="status" aria-live="polite" aria-atomic="true">Asistente disponible</div>
 
@@ -686,9 +744,18 @@
                     </div>
                     <div class="ai-chat-messages" id="ai-chat-messages" role="log" aria-live="polite"></div>
                     <form id="ai-chat-form" aria-label="Formulario de entrada de chat">
+                        <button type="button" id="ai-voice-record-btn" class="ai-voice-record-btn" aria-label="Grabar mensaje de voz" title="Grabar mensaje de voz">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                <line x1="12" y1="19" x2="12" y2="23"/>
+                                <line x1="8" y1="23" x2="16" y2="23"/>
+                            </svg>
+                        </button>
                         <input type="text" id="ai-chat-input" placeholder="${aiWidgetData.placeholder || 'Escribe tu mensaje...'}" autocomplete="off" inputmode="text" aria-label="Entrada de mensaje">
                         <button type="submit" id="ai-chat-submit-btn" aria-label="Enviar mensaje">&#x27A4;</button>
                     </form>
+                    ${aiWidgetData.showBranding ? '<div class="ai-chat-branding">Powered by <a href="https://workfluz.com" target="_blank" rel="noopener">Workfluz.com</a></div>' : ''}
                 </div>
             `;
 
@@ -700,8 +767,11 @@
          * Carga el SDK de VAPI
          */
         loadVapiSDK() {
-            if (this.provider !== 'vapi' || !this.vapiPublicKey) {
-                console.log('VAPI no configurado o no es el proveedor seleccionado');
+            // Cargar VAPI si el modo de voz está habilitado y hay API key
+            const voiceEnabled = aiWidgetData.voiceEnabled;
+            
+            if (!voiceEnabled || !this.vapiPublicKey) {
+                console.log('VAPI no configurado o modo de voz deshabilitado');
                 return;
             }
 
@@ -721,6 +791,7 @@
                     assistant: this.vapiAssistantId
                 });
 
+                console.log('✅ VAPI SDK cargado correctamente');
                 this.setupVapiListeners();
             };
 
@@ -736,9 +807,13 @@
 
             this.vapiInstance.on('call-start', () => {
                 this.isCallActive = true;
+                this.callStartTime = Date.now(); // Registrar tiempo de inicio
+                
                 document.getElementById('ai-logo-container').classList.remove('loading');
                 document.getElementById('ai-logo-container').classList.add('session-active');
                 this.updateStatus('Conectado', 'active', true);
+                
+                console.log('🎤 Llamada iniciada, timer comenzado');
                 
                 if (this.currentMode === 'text') {
                     this.vapiInstance.setMuted(false);
@@ -750,17 +825,34 @@
                 }
             });
 
-            this.vapiInstance.on('call-end', () => {
+            this.vapiInstance.on('call-end', async () => {
+                // Calcular duración de la llamada
+                if (this.callStartTime) {
+                    this.callDuration = Math.floor((Date.now() - this.callStartTime) / 1000); // Duración en segundos
+                    console.log(`📞 Llamada finalizada. Duración: ${this.callDuration} segundos (${(this.callDuration / 60).toFixed(2)} minutos)`);
+                    
+                    // Enviar duración al servidor
+                    await this.logVoiceUsage(this.callDuration);
+                    
+                    // Resetear variables
+                    this.callStartTime = null;
+                    this.callDuration = 0;
+                }
+                
                 this.isCallActive = false;
                 this.isSpeaking = false;
+                
                 if (this.isChatOpen && this.currentMode === 'text') {
                     this.toggleChatWindow(false);
                 }
+                
                 document.getElementById('ai-logo-container').classList.remove('session-active', 'loading');
                 this.updateStatus('Llamada finalizada', '', true);
+                
                 if (this.animationId) {
                     cancelAnimationFrame(this.animationId);
                 }
+                
                 this.currentMode = null;
             });
 
@@ -788,9 +880,20 @@
 
             this.vapiInstance.on('error', (error) => {
                 console.error('Error de Vapi:', error);
+                
+                // Si había llamada activa, registrar el tiempo antes del error
+                if (this.callStartTime) {
+                    this.callDuration = Math.floor((Date.now() - this.callStartTime) / 1000);
+                    console.log(`⚠️ Error en llamada. Duración antes de error: ${this.callDuration} segundos`);
+                    this.logVoiceUsage(this.callDuration);
+                    this.callStartTime = null;
+                    this.callDuration = 0;
+                }
+                
                 this.isCallActive = false;
                 document.getElementById('ai-logo-container').classList.remove('session-active', 'loading');
                 this.updateStatus('Error de conexión', '', true);
+                
                 if (this.isChatOpen && this.currentMode === 'text') {
                     this.removeTypingIndicator();
                     this.setChatInputEnabled(false);
@@ -804,95 +907,200 @@
          * Adjunta event listeners
          */
         attachEventListeners() {
+            console.log('🔧 Adjuntando event listeners...');
+            
             const logoButton = document.getElementById('ai-logo-button');
-            const modePrompt = document.getElementById('ai-mode-prompt');
-            const modeClose = document.getElementById('ai-mode-close');
-            const voiceBtn = document.getElementById('ai-voice-mode-btn');
-            const textBtn = document.getElementById('ai-text-mode-btn');
+            const voiceBtn = document.getElementById('ai-voice-btn');
+            const chatBtn = document.getElementById('ai-chat-btn');
             const chatCloseBtn = document.getElementById('ai-chat-close-btn');
             const chatForm = document.getElementById('ai-chat-form');
             const switchToVoiceBtn = document.getElementById('ai-switch-to-voice-btn');
+            const voiceRecordBtn = document.getElementById('ai-voice-record-btn');
 
-            logoButton.addEventListener('click', () => {
+            console.log('Botones encontrados:', {
+                logoButton: !!logoButton,
+                voiceBtn: !!voiceBtn,
+                chatBtn: !!chatBtn,
+                chatCloseBtn: !!chatCloseBtn,
+                chatForm: !!chatForm,
+                voiceRecordBtn: !!voiceRecordBtn
+            });
+
+            // Event listener para el botón del logo
+            logoButton.addEventListener('click', async () => {
+                const logoContainer = document.getElementById('ai-logo-container');
+                
                 if (this.isCallActive) {
+                    // Si hay llamada activa, detenerla
+                    console.log('🛑 Deteniendo llamada de voz...');
                     if (this.vapiInstance) {
                         this.vapiInstance.stop();
                     }
+                    logoContainer.classList.remove('menu-open');
                 } else if (this.isChatOpen) {
+                    // Si hay chat abierto, cerrarlo
+                    console.log('🛑 Cerrando chat...');
                     this.toggleChatWindow(false);
                     this.currentMode = null;
+                    logoContainer.classList.remove('menu-open');
                 } else {
-                    // Verificar cuántos modos están habilitados
-                    const voiceEnabled = aiWidgetData.voiceEnabled;
-                    const textEnabled = aiWidgetData.textEnabled;
-                    const floatingButtons = document.getElementById('ai-floating-buttons');
+                    // Detectar si solo hay un modo habilitado
+                    const voiceOnly = aiWidgetData.voiceEnabled && !aiWidgetData.textEnabled;
+                    const textOnly = !aiWidgetData.voiceEnabled && aiWidgetData.textEnabled;
                     
-                    // Si solo un modo está habilitado, ir directamente a ese modo
-                    if (voiceEnabled && !textEnabled) {
-                        // Solo voz habilitada
-                        this.currentMode = 'voice';
-                        document.getElementById('ai-logo-container').classList.add('loading');
-                        this.updateStatus('Conectando...', 'connecting');
-                        if (this.vapiInstance) {
-                            this.vapiInstance.start(this.vapiAssistantId);
+                    if (voiceOnly) {
+                        // Iniciar VOZ automáticamente
+                        console.log('🎤 Solo modo voz habilitado - Iniciando automáticamente...');
+                        
+                        // Verificar límites de voz
+                        const voiceLimits = await this.checkVoiceLimits();
+                        
+                        if (!voiceLimits.allowed) {
+                            console.warn('⚠️ Límite de voz alcanzado');
+                            this.updateStatus(voiceLimits.message, '', true);
+                            return;
                         }
-                    } else if (!voiceEnabled && textEnabled) {
-                        // Solo texto habilitado
+                        
+                        // Iniciar modo de voz
+                        this.currentMode = 'voice';
+                        logoContainer.classList.add('loading');
+                        this.updateStatus('Conectando...', 'connecting');
+                        
+                        // Mostrar branding temporal si está habilitado
+                        if (aiWidgetData.showBranding) {
+                            this.showVoiceBranding();
+                        }
+                        
+                        if (this.vapiInstance) {
+                            console.log('✅ Iniciando VAPI...');
+                            this.vapiInstance.start(this.vapiAssistantId);
+                        } else {
+                            console.error('❌ VAPI Instance no disponible');
+                            this.updateStatus('Error: VAPI no configurado', 'connecting');
+                            logoContainer.classList.remove('loading');
+                        }
+                        
+                    } else if (textOnly) {
+                        // Abrir CHAT automáticamente
+                        console.log('💬 Solo modo chat habilitado - Abriendo automáticamente...');
                         this.currentMode = 'text';
                         this.toggleChatWindow(true);
-                    } else if (voiceEnabled && textEnabled) {
-                        // Ambos habilitados, mostrar botones flotantes
-                        if (floatingButtons.classList.contains('visible')) {
-                            floatingButtons.classList.remove('visible');
-                        } else {
-                            floatingButtons.classList.add('visible');
-                        }
+                        
                     } else {
-                        // Ninguno habilitado (no debería pasar, pero por seguridad)
-                        console.warn('No hay modos de interacción habilitados');
+                        // Ambos modos habilitados - Toggle del menú de botones
+                        console.log('🔄 Toggle menú de botones (ambos modos habilitados)');
+                        logoContainer.classList.toggle('menu-open');
                     }
                 }
             });
 
-            if (modeClose) {
-                modeClose.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    modePrompt.classList.remove('visible');
-                });
-            }
-
-            // Cerrar modal al hacer click en el fondo
-            if (modePrompt) {
-                modePrompt.addEventListener('click', (e) => {
-                    if (e.target === modePrompt) {
-                        modePrompt.classList.remove('visible');
-                    }
-                });
-            }
-
+            // Event listener para botón de VOZ (pequeño)
             if (voiceBtn) {
-                voiceBtn.addEventListener('click', () => {
-                    const floatingButtons = document.getElementById('ai-floating-buttons');
-                    modePrompt.classList.remove('visible');
-                    floatingButtons.classList.remove('visible');
+                voiceBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    console.log('🎤 Botón de voz clickeado');
+                    
+                    const logoContainer = document.getElementById('ai-logo-container');
+                    
+                    // Cerrar menú de botones
+                    logoContainer.classList.remove('menu-open');
+                    
+                    // Si ya hay una llamada activa, detenerla
+                    if (this.isCallActive) {
+                        console.log('🛑 Deteniendo llamada activa...');
+                        if (this.vapiInstance) {
+                            this.vapiInstance.stop();
+                        }
+                        return;
+                    }
+                    
+                    // Verificar límites ANTES de iniciar llamada
+                    console.log('🔍 Verificando límites de voz...');
+                    const voiceLimits = await this.checkVoiceLimits();
+                    
+                    if (!voiceLimits.allowed) {
+                        console.warn('⚠️ Límite de voz alcanzado');
+                        this.updateStatus(voiceLimits.message, '', true);
+                        
+                        // Si el chat está cerrado, mostrarlo con el mensaje de límite
+                        if (!this.isChatOpen && aiWidgetData.textEnabled) {
+                            this.currentMode = 'text';
+                            this.toggleChatWindow(true);
+                            this.addMessage(voiceLimits.message, 'ai');
+                            this.showUpgradePrompt();
+                        }
+                        return;
+                    }
+                    
+                    console.log('✅ Límites OK, iniciando llamada...');
+                    
+                    // Si el chat está abierto, cerrarlo primero
+                    if (this.isChatOpen) {
+                        console.log('🔄 Cerrando chat para iniciar voz...');
+                        this.toggleChatWindow(false);
+                    }
+                    
+                    // Iniciar modo de voz
                     this.currentMode = 'voice';
-                    document.getElementById('ai-logo-container').classList.add('loading');
+                    logoContainer.classList.add('loading');
                     this.updateStatus('Conectando...', 'connecting');
+                    
+                    // Mostrar branding temporal si está habilitado
+                    if (aiWidgetData.showBranding) {
+                        this.showVoiceBranding();
+                    }
+                    
                     if (this.vapiInstance) {
+                        console.log('✅ Iniciando VAPI...');
                         this.vapiInstance.start(this.vapiAssistantId);
+                    } else {
+                        console.error('❌ VAPI Instance no disponible');
+                        this.updateStatus('Error: VAPI no configurado', 'connecting');
                     }
                 });
+            } else {
+                console.warn('⚠️ Botón de voz no encontrado');
             }
 
-            if (textBtn) {
-                textBtn.addEventListener('click', () => {
-                    const floatingButtons = document.getElementById('ai-floating-buttons');
-                    modePrompt.classList.remove('visible');
-                    floatingButtons.classList.remove('visible');
+            // Event listener para botón de CHAT (pequeño)
+            if (chatBtn) {
+                chatBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    console.log('💬 Botón de chat clickeado');
+                    
+                    const logoContainer = document.getElementById('ai-logo-container');
+                    
+                    // Cerrar menú de botones
+                    logoContainer.classList.remove('menu-open');
+                    
+                    // Si ya hay chat abierto, cerrarlo
+                    if (this.isChatOpen) {
+                        console.log('🛑 Cerrando chat...');
+                        this.toggleChatWindow(false);
+                        this.currentMode = null;
+                        return;
+                    }
+                    
+                    // Si hay una llamada activa, detenerla primero
+                    if (this.isCallActive) {
+                        console.log('🔄 Deteniendo voz para abrir chat...');
+                        if (this.vapiInstance) {
+                            this.vapiInstance.stop();
+                        }
+                        // Esperar un momento para que se detenga
+                        setTimeout(() => {
+                            this.currentMode = 'text';
+                            this.toggleChatWindow(true);
+                        }, 300);
+                        return;
+                    }
+                    
+                    // Abrir chat
                     this.currentMode = 'text';
                     this.toggleChatWindow(true);
                 });
+            } else {
+                console.warn('⚠️ Botón de chat no encontrado');
             }
 
             if (chatCloseBtn) {
@@ -901,18 +1109,6 @@
                     this.currentMode = null;
                 });
             }
-
-            // Cerrar botones flotantes al hacer click fuera
-            document.addEventListener('click', (e) => {
-                const floatingButtons = document.getElementById('ai-floating-buttons');
-                const logoContainer = document.getElementById('ai-logo-container');
-                
-                if (floatingButtons && floatingButtons.classList.contains('visible')) {
-                    if (!logoContainer.contains(e.target)) {
-                        floatingButtons.classList.remove('visible');
-                    }
-                }
-            });
 
             if (chatForm) {
                 chatForm.addEventListener('submit', (e) => {
@@ -929,6 +1125,156 @@
                     }, 200);
                 });
             }
+
+            // Event listener para botón de grabación de voz
+            if (voiceRecordBtn) {
+                voiceRecordBtn.addEventListener('click', () => {
+                    if (this.isRecording) {
+                        this.stopVoiceRecording();
+                    } else {
+                        this.startVoiceRecording();
+                    }
+                });
+            }
+        }
+
+        /**
+         * Inicia grabación de voz
+         */
+        async startVoiceRecording() {
+            const recordBtn = document.getElementById('ai-voice-record-btn');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                this.mediaRecorder = new MediaRecorder(stream);
+                this.audioChunks = [];
+
+                this.mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        this.audioChunks.push(event.data);
+                    }
+                };
+
+                this.mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                    await this.sendVoiceMessage(audioBlob);
+                    
+                    // Detener el stream
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                this.mediaRecorder.start();
+                this.isRecording = true;
+                recordBtn.classList.add('recording');
+                recordBtn.title = 'Detener grabación';
+                
+                console.log('🎤 Grabación iniciada');
+            } catch (error) {
+                console.error('Error al iniciar grabación:', error);
+                this.addMessage('No se pudo acceder al micrófono. Por favor, verifica los permisos.', 'ai');
+            }
+        }
+
+        /**
+         * Detiene grabación de voz
+         */
+        stopVoiceRecording() {
+            const recordBtn = document.getElementById('ai-voice-record-btn');
+            
+            if (this.mediaRecorder && this.isRecording) {
+                this.mediaRecorder.stop();
+                this.isRecording = false;
+                recordBtn.classList.remove('recording');
+                recordBtn.title = 'Grabar mensaje de voz';
+                
+                console.log('🛑 Grabación detenida');
+            }
+        }
+
+        /**
+         * Envía mensaje de voz
+         */
+        async sendVoiceMessage(audioBlob) {
+            // Verificar límites
+            const limits = await this.checkMessageLimit();
+            if (!limits.allowed) {
+                this.addMessage(limits.message, 'ai');
+                this.showUpgradePrompt();
+                return;
+            }
+
+            // Mostrar mensaje del usuario
+            this.addMessage('🎤 Mensaje de voz enviado', 'user');
+            this.addTypingIndicator();
+
+            // Convertir audio a base64
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            
+            reader.onloadend = async () => {
+                const base64Audio = reader.result;
+                
+                // Enviar a n8n
+                if (aiWidgetData.chatProvider === 'n8n' && aiWidgetData.n8nWebhookUrl) {
+                    try {
+                        const response = await fetch(aiWidgetData.n8nWebhookUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                audio: base64Audio,
+                                audioType: 'base64',
+                                mimeType: audioBlob.type,
+                                session_id: this.sessionId,
+                                conversation_history: this.conversationHistory || [],
+                                isVoiceMessage: true
+                            }),
+                        });
+
+                        const data = await response.json();
+                        this.removeTypingIndicator();
+
+                        // Soporte flexible para diferentes formatos de respuesta
+                        const botResponse = data.response || data.output || data[0]?.output;
+                        console.log('📥 Respuesta de voz de n8n:', data);
+                        console.log('🎤 Bot dice (voz):', botResponse);
+
+                        if (botResponse) {
+                            this.addMessage(botResponse, 'ai');
+                            
+                            // Guardar threadId si existe
+                            if (data.threadId || data[0]?.threadId) {
+                                this.threadId = data.threadId || data[0]?.threadId;
+                                console.log('🔗 ThreadId guardado (voz):', this.threadId);
+                            }
+                            
+                            // Guardar en historial
+                            if (!this.conversationHistory) {
+                                this.conversationHistory = [];
+                            }
+                            this.conversationHistory.push({
+                                role: 'user',
+                                content: '[Mensaje de voz]'
+                            });
+                            this.conversationHistory.push({
+                                role: 'assistant',
+                                content: botResponse
+                            });
+                        } else {
+                            console.error('❌ No se encontró respuesta en:', data);
+                            this.addMessage('Lo siento, no pude procesar tu mensaje de voz.', 'ai');
+                        }
+                    } catch (error) {
+                        this.removeTypingIndicator();
+                        this.addMessage('Error al enviar el mensaje de voz. Por favor, intenta de nuevo.', 'ai');
+                        console.error('Error enviando voz a n8n:', error);
+                    }
+                } else {
+                    this.removeTypingIndicator();
+                    this.addMessage('Los mensajes de voz solo están disponibles con n8n configurado.', 'ai');
+                }
+            };
         }
 
         /**
@@ -951,16 +1297,72 @@
                 return;
             }
 
+            // Agregar indicador de escritura
+            this.addTypingIndicator();
+
             // Si está usando VAPI en modo texto
             if (this.provider === 'vapi' && this.vapiInstance && this.isCallActive) {
-                this.addTypingIndicator();
                 this.vapiInstance.send({
                     type: 'add-message',
                     message: { role: 'user', content: message },
                 });
-            } else {
-                // Usar REST API del plugin
-                this.addTypingIndicator();
+            } 
+            // Si está usando n8n webhook
+            else if (aiWidgetData.chatProvider === 'n8n' && aiWidgetData.n8nWebhookUrl) {
+                try {
+                    const response = await fetch(aiWidgetData.n8nWebhookUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            session_id: this.sessionId,
+                            conversation_history: this.conversationHistory || [],
+                        }),
+                    });
+
+                    const data = await response.json();
+                    this.removeTypingIndicator();
+
+                    // Soportar tanto 'response' como 'output' (n8n usa 'output')
+                    const botResponse = data.response || data.output || data[0]?.output;
+                    
+                    console.log('📥 Respuesta de n8n:', data); // DEBUG
+                    console.log('🤖 Bot dice:', botResponse); // DEBUG
+
+                    if (botResponse) {
+                        this.addMessage(botResponse, 'ai');
+                        
+                        // Guardar threadId si viene
+                        if (data.threadId || data[0]?.threadId) {
+                            this.threadId = data.threadId || data[0]?.threadId;
+                        }
+                        
+                        // Guardar en historial
+                        if (!this.conversationHistory) {
+                            this.conversationHistory = [];
+                        }
+                        this.conversationHistory.push({
+                            role: 'user',
+                            content: message
+                        });
+                        this.conversationHistory.push({
+                            role: 'assistant',
+                            content: botResponse
+                        });
+                    } else {
+                        console.error('❌ No se encontró respuesta en:', data);
+                        this.addMessage('Lo siento, no pude procesar tu mensaje.', 'ai');
+                    }
+                } catch (error) {
+                    this.removeTypingIndicator();
+                    this.addMessage('Error de conexión con n8n. Por favor, verifica la configuración.', 'ai');
+                    console.error('Error n8n:', error);
+                }
+            } 
+            // Usar REST API del plugin (OpenAI)
+            else {
                 try {
                     const response = await fetch(`${this.apiUrl}/chat`, {
                         method: 'POST',
@@ -1066,6 +1468,31 @@
         }
 
         /**
+         * Muestra branding temporal para voz (2 segundos)
+         */
+        showVoiceBranding() {
+            // Crear elemento de branding si no existe
+            let brandingEl = document.getElementById('ai-voice-branding');
+            if (!brandingEl) {
+                brandingEl = document.createElement('div');
+                brandingEl.id = 'ai-voice-branding';
+                brandingEl.className = 'ai-voice-branding';
+                brandingEl.innerHTML = 'Powered by <a href="https://workfluz.com" target="_blank" rel="noopener">Workfluz.com</a>';
+                document.body.appendChild(brandingEl);
+            }
+            
+            // Mostrar con animación
+            setTimeout(() => {
+                brandingEl.classList.add('visible');
+            }, 100);
+            
+            // Ocultar después de 2 segundos
+            setTimeout(() => {
+                brandingEl.classList.remove('visible');
+            }, 2100);
+        }
+
+        /**
          * Actualiza estado
          */
         updateStatus(text, className, autoHide) {
@@ -1145,9 +1572,16 @@
             try {
                 const response = await fetch(`${this.apiUrl}/check-limits?session_id=${this.sessionId}`);
                 const data = await response.json();
-                return data;
+                
+                // Adaptar respuesta del servidor
+                return {
+                    allowed: data.can_send !== false,
+                    remaining: data.usage ? data.usage.remaining : '?',
+                    message: data.can_send === false ? '¡Has alcanzado tu límite! Actualiza a Premium.' : ''
+                };
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error verificando límites:', error);
+                // En caso de error, permitir el envío
                 return { allowed: true, remaining: '?' };
             }
         }
@@ -1173,6 +1607,71 @@
             `;
             messagesContainer.appendChild(upgradeDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        /**
+         * Registra uso de voz en el servidor
+         */
+        async logVoiceUsage(durationSeconds) {
+            if (!durationSeconds || durationSeconds < 1) {
+                console.log('⏭️ Duración muy corta, no se registra');
+                return;
+            }
+
+            try {
+                console.log(`📊 Enviando duración al servidor: ${durationSeconds} segundos`);
+                
+                const response = await fetch(`${this.apiUrl}/log-voice`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: this.sessionId,
+                        duration_seconds: durationSeconds,
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('✅ Uso de voz registrado correctamente');
+                    console.log('📈 Límites de voz:', data.voice_limits);
+                    
+                    // Verificar si está cerca del límite
+                    if (data.voice_limits && data.voice_limits.percentage >= 80 && data.voice_limits.limit !== 'unlimited') {
+                        this.updateStatus(`⚠️ ${data.voice_limits.remaining} minutos restantes`, '', true);
+                    }
+                } else {
+                    console.warn('⚠️ No se pudo registrar el uso de voz:', data);
+                }
+            } catch (error) {
+                console.error('❌ Error al registrar uso de voz:', error);
+            }
+        }
+
+        /**
+         * Verifica límites antes de iniciar llamada de voz
+         */
+        async checkVoiceLimits() {
+            try {
+                const response = await fetch(`${this.apiUrl}/check-limits?session_id=${this.sessionId}`);
+                const data = await response.json();
+                
+                if (data.voice && !data.voice.allowed) {
+                    return {
+                        allowed: false,
+                        message: `¡Has alcanzado tu límite de ${data.voice.limit} minutos de voz! Actualiza a Premium para voz ilimitada.`,
+                        remaining: data.voice.remaining
+                    };
+                }
+                
+                return { allowed: true };
+            } catch (error) {
+                console.error('Error verificando límites de voz:', error);
+                // En caso de error, permitir el uso
+                return { allowed: true };
+            }
         }
 
         /**

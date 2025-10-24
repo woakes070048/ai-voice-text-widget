@@ -58,7 +58,7 @@ class AI_Voice_Text_Widget_Database {
     /**
      * Guarda un mensaje en la conversación.
      */
-    public function save_message( $session_id, $message_type, $message_text, $tokens = 0, $response_time = 0, $user_id = null ) {
+    public function save_message( $session_id, $message_type, $message_text, $tokens = 0, $response_time = 0, $user_id = null, $interaction_type = 'text', $duration_seconds = 0 ) {
         global $wpdb;
 
         $wpdb->insert(
@@ -67,11 +67,13 @@ class AI_Voice_Text_Widget_Database {
                 'user_id' => $user_id,
                 'session_id' => $session_id,
                 'message_type' => $message_type,
+                'interaction_type' => $interaction_type,
                 'message_text' => $message_text,
                 'tokens_used' => $tokens,
                 'response_time' => $response_time,
+                'duration_seconds' => $duration_seconds,
             ),
-            array( '%d', '%s', '%s', '%s', '%d', '%f' )
+            array( '%d', '%s', '%s', '%s', '%s', '%d', '%f', '%d' )
         );
 
         return $wpdb->insert_id;

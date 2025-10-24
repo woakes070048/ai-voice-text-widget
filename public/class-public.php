@@ -53,6 +53,9 @@ class AI_Voice_Text_Widget_Public {
             'logoSvg' => get_option( 'ai_widget_logo_svg', '' ),
             'voiceEnabled' => get_option( 'ai_widget_voice_enabled', true ),
             'textEnabled' => get_option( 'ai_widget_text_enabled', true ),
+            'chatProvider' => get_option( 'ai_widget_chat_provider', 'openai' ),
+            'n8nWebhookUrl' => get_option( 'ai_widget_n8n_webhook_url', '' ),
+            'showBranding' => AI_Widget_Freemium::should_show_branding(),
         ) );
     }
 
