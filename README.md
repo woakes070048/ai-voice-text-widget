@@ -212,17 +212,17 @@ add_action( 'ai_widget_daily_analytics', function() {
 ## 📞 Support
 
 - **Email**: support@workfluz.com
-- **WhatsApp**: +57 333 430 8871
+- **WhatsApp**: +57 311 748 3770
 - **WordPress Forum**: [Support Forum](https://wordpress.org/support/plugin/ai-voice-text-widget/)
 - **Documentation**: [workfluz.com/docs](https://workfluz.com/docs)
 
 ## 👨‍💻 About the Developer
 
 **Josue Ayala**
-- Founder & Lead Developer at Workfluz
+- Lead Developer at Workfluz
 - Location: Medellín, Colombia
-- Contact: support@workfluz.com
-- WhatsApp: +57 333 430 8871
+- Contact: ayalamesajosue@gmail.com
+- WhatsApp: +57 311 748 3770
 
 ## 📄 License
 
